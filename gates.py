@@ -1,6 +1,5 @@
 import numpy as np
 from typing import Callable
-CHECK = "Ofek is cheking"
 N = 4
 
 DIM = 2 * N - 1  #Dimension of the Hiblert space
