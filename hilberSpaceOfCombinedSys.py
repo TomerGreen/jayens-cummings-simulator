@@ -39,14 +39,18 @@ def evolve_state(init_state: Qobj, ham: Qobj, steps, dt=DT) -> list:
     return psi_t
 
 
-def init_state(alpha=ALPHA) -> Qobj:
-    """Returns the initial two-system state"""
+def case1_init_state(alpha=ALPHA) -> Qobj:
+    """Returns the initial combined state for case I"""
     bos_vac = basis(N)
     disp_op = Qobj.expm(alpha * create(N) - alpha.conjugate() * destroy(N))
     bos_coher = disp_op * bos_vac
     tls_gs = sigmam() * basis(2)
     psi0 = tensor(bos_coher, tls_gs)
     return psi0
+
+
+def case2_init_state():
+    pass
 
 
 def draw_excited_state_population(psi_t: Iterable, steps=STEPS, dt=DT):
@@ -74,8 +78,12 @@ def draw_purity_plot(psi_t: Iterable, steps=STEPS, dt=DT):
     plt.show()
 
 
+def draw_bosonic_state_density():
+    pass
+
+
 if __name__ == '__main__':
     H = jc_ham()
-    psi0 = init_state()
+    psi0 = case1_init_state()
     psi_t = evolve_state(psi0, H, STEPS)
     draw_purity_plot(psi_t)
