@@ -1,10 +1,10 @@
 import numpy as np
-from scipy.linalg import expm
-from scipy.constants import hbar
+# from scipy.linalg import expm
+from qutip import *
 
 
 #  ==== Params ==== #
-N = 10  # max num of photons is N-1
+N = 5  # max num of photons is N-1
 ALPHA = 7
 WC = 6 * 2 * np.pi * 10e9  # cavity frequency
 WA = 6 * 2 * np.pi * 10e9  # atom frequency
@@ -25,46 +25,41 @@ A_DAG = A.conj().T
 
 
 def jc_ham(wc=WC, wa=WA, g=G):
-    """Returns the Jaynes-Cummings Hamiltonian as a (2N,2N) array."""
-    ham = hbar * wc * np.kron(np.dot(A_DAG, A), np.identity(2)) + hbar * wa * np.kron(np.identity(N), Z)
-    ham -= hbar * g * (np.kron(A, SP) + np.kron(A_DAG, SM))
+    """Returns the Jaynes-Cummings Hamiltonian."""
+    ham = wc * tensor(create(N) * destroy(N), identity(2))
+    ham += (1 / 2) * wa * tensor(identity(N), sigmaz())
+    ham -= g * (tensor(destroy(N), sigmap()) + tensor(create(N), sigmam()))
     return ham
 
 
-def evolve_state(init_state: np.ndarray, ham: np.ndarray, steps, dt=DT):
+def evolve_state(init_state: Qobj, ham: Qobj, steps, dt=DT):
     """
     Evolves an initial state in time according to a given Hamiltonian and returns an array describing the state
     after each time step.
-    :param init_state: The initial state as an (2N,1) array.
-    :param ham: The Hamiltonian as a (2N,2N) array.
-    :param steps: The number of time steps.
-    :param dt: The duration of time step.
-    :return An array of shape (2N, steps) where each column contains the amplitudes of the state after the
+    :return An list of ket states, where each ket state is the time evolution of the initial state after the
     corresponding time step.
     """
-    time_evo_op = expm((-1j * dt / hbar) * ham)
+    time_evo_op = Qobj.expm((-1j * dt) * ham)
     psi = init_state
-    psi_t = np.zeros(psi.shape[0], steps)
+    psi_t = list()
     for step in range(steps):
-        psi = time_evo_op.dot(psi)
-        psi_t[:, steps] = psi
+        print(psi)
+        psi = time_evo_op * psi
+        psi_t.append(psi)
     return psi_t
 
 
-def disp_op(alpha=ALPHA):
-    """Returns a bosonic coherent state as an (N,N) array."""
-    return expm(alpha * A_DAG - ALPHA.conjugate() * A)
-
-
-def get_init_state(alpha=ALPHA):
-    """Returns the initial state as an (2N,1) array."""
-    bos_vac = np.zeros((N, 1))  # initial bosonic state
-    bos_vac[0, 0] = 1
-    bos_coher = disp_op(alpha).dot(bos_vac)
-    tls_state = np.array([[0, 1]]).T  # initial TLS state
-    psi0 = np.kron(bos_coher, tls_state)
+def init_state(alpha=ALPHA):
+    """Returns the initial two-system state"""
+    bos_vac = basis(N)
+    disp_op = Qobj.expm(alpha * create(N) - alpha.conjugate() * destroy(N))
+    bos_coher = disp_op * bos_vac
+    tls_gs = sigmam() * basis(2)
+    psi0 = tensor(bos_coher, tls_gs)
     return psi0
 
 
 if __name__ == '__main__':
-    psi0 = get_init_state()
+    H = jc_ham()
+    psi0 = init_state()
+    psi_t = evolve_state(psi0, H, 8000, DT)
