@@ -4,7 +4,8 @@ from qutip import *
 from typing import Iterable
 import matplotlib.pyplot as plt
 
-N = 100  # max num of photons is N-1
+
+N = 80  # max num of photons is N-1
 ALPHA = 7
 WC = 6 * 2 * np.pi * 1e9  # cavity frequency
 # WA_1 = 6 * 2 * np.pi * 1e9  # atom frequency for case 1
@@ -26,7 +27,7 @@ def jc_ham(wc=WC, wa=case_2["WA"], g=G) -> Qobj:
     return ham
 
 
-def evolve_state(init_state: Qobj, ham: Qobj, steps=case_2["STEPS"], dt=case_2["DT"]) -> list:
+def evolve_state(init_state: Qobj, ham: Qobj, steps, dt=DT) -> list:
     """
     Evolves an initial state in time according to a given Hamiltonian and returns an array describing the state
     after each time step.
@@ -61,9 +62,23 @@ def case2_init_state(alpha=ALPHA) -> Qobj:
     return psi0
 
 
-def draw_excited_state_population(psi_t: Iterable, steps=case_2["STEPS"], dt=case_2["DT"]):
+def rdm(rho: Qobj) -> Qobj:
+    """
+    Returns the reduced density matrix of the two level system.
+    :param rho: The combined state density matrix as a (2N, 2N) array.
+    :return: The reduced density matrix as a (2,2) array.
+    """
+    rho_data = rho.data.toarray()
+    rdm = np.empty((2, 2), np.complex128)
+    for i, j in np.ndindex(rdm.shape):
+        rho_part = rho_data[i::2, j::2]
+        rdm[i, j] = np.trace(rho_part)
+    return Qobj(rdm)
+
+
+def draw_excited_state_population(psi_t: Iterable, steps=STEPS, dt=DT):
     """Draws the excited state population figure."""
-    rdms = [state.ptrace(1) for state in psi_t]
+    rdms = [rdm(psi * psi.dag()) for psi in psi_t]
     ee_pop = [rho[0, 0] for rho in rdms]
     times = np.linspace(0.0, steps * dt, steps)
     plt.plot(times, ee_pop, linewidth=0.5)
@@ -75,8 +90,7 @@ def draw_excited_state_population(psi_t: Iterable, steps=case_2["STEPS"], dt=cas
 
 def draw_purity_plot(psi_t: Iterable, steps=case_2["STEPS"], dt=case_2["DT"]):
     """Draws the purity figure"""
-    rdms = [state.ptrace(1).data.toarray() for state in psi_t]
-    # purities = [1-np.trace(np.dot(rdm, logm(rdm))) for rdm in rdms]
+    rdms = [rdm(psi * psi.dag()).data.toarray() for psi in psi_t]
     purities = [np.trace(np.dot(rdm, rdm)) for rdm in rdms]
     times = np.linspace(0.0, steps * dt, steps)
     plt.plot(times, purities, linewidth=0.7)
