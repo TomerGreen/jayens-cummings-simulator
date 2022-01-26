@@ -19,7 +19,7 @@ case_1 = {"WA": 6 * 2 * np.pi * 1e9, "TOT_TIME": 1.6e-6, "STEPS": 8000, "DT": 0.
 case_2 = {"WA": 5 * 2 * np.pi * 1e9, "TOT_TIME": 4e-6, "STEPS": 4000, "DT": 1e-9}
 
 
-def jc_ham(wc=WC, wa=case_2["WA"], g=G) -> Qobj:
+def jc_ham(wc=WC, wa=case_1["WA"], g=G) -> Qobj:
     """Returns the Jaynes-Cummings Hamiltonian."""
     ham = wc * tensor(create(N) * destroy(N), identity(2))
     ham += (1 / 2) * wa * tensor(identity(N), sigmaz())
@@ -88,7 +88,7 @@ def draw_excited_state_population(psi_t: Iterable, steps=STEPS, dt=DT):
     plt.show()
 
 
-def draw_purity_plot(psi_t: Iterable, steps=case_2["STEPS"], dt=case_2["DT"]):
+def draw_purity_plot(psi_t: Iterable, steps=case_1["STEPS"], dt=case_1["DT"]):
     """Draws the purity figure"""
     rdms = [rdm(psi * psi.dag()).data.toarray() for psi in psi_t]
     purities = [np.trace(np.dot(rdm, rdm)) for rdm in rdms]
@@ -100,15 +100,16 @@ def draw_purity_plot(psi_t: Iterable, steps=case_2["STEPS"], dt=case_2["DT"]):
     plt.show()
 
 
-def draw_bosonic_state_density(psi_t: Iterable,  steps=case_2["STEPS"], dt=case_2["DT"]):
-    psi = np.array(psi_t)
-    print(psi)
-    state_dens = [st * np.conjugate(st) for st in psi]
+def draw_bosonic_state_density(psi_t: Iterable,  steps=case_1["STEPS"], dt=case_1["DT"]):
+    psi = np.array(psi_t).squeeze()
+    # psi = psi[:, ::2]
+    state_dens = np.array([np.real(st * np.conjugate(st)) for st in psi]).T
+    state_dens = np.concatenate((state_dens[::2, :], state_dens[1::2, :]), axis=0)
+    print(state_dens.shape)
     times = np.linspace(0.0, steps * dt, steps) * np.ones_like(state_dens)
-    states = np.linspace(0.0, len(state_dens)) * np.ones_like(state_dens)
-    # print(state_dens)
-    # print(times.shape)
-    # print(states.shape)
+    states = np.expand_dims(np.arange(0, len(state_dens)), 1) * np.ones_like(state_dens)
+    #* np.ones_like(state_dens[0])
+    print(state_dens)
     plt.pcolormesh(times, states, state_dens, cmap='hot')
     plt.show()
 
@@ -116,6 +117,6 @@ def draw_bosonic_state_density(psi_t: Iterable,  steps=case_2["STEPS"], dt=case_
 if __name__ == '__main__':
     H = jc_ham()
     psi0 = case2_init_state()
-    psi_t = evolve_state(psi0, H, case_2["STEPS"])
+    psi_t = evolve_state(psi0, H, case_1["STEPS"])
     # draw_purity_plot(psi_t)
     draw_bosonic_state_density(psi_t)
