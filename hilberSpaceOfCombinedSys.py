@@ -8,36 +8,31 @@ import matplotlib.pyplot as plt
 N = 80  # max num of photons is N-1
 ALPHA = 7
 WC = 6 * 2 * np.pi * 1e9  # cavity frequency
-# WA_1 = 6 * 2 * np.pi * 1e9  # atom frequency for case 1
-# WA_2 = 5 * 2 * np.pi * 1e9  # atom frequency for case 2
 G = 15 * 2 * np.pi * 1e6  # coupling strength
-DT = 0.2e-9
-TOT_TIME = 1.6e-6
-STEPS = 8000
 
-case_1 = {"WA": 6 * 2 * np.pi * 1e9, "TOT_TIME": 1.6e-6, "STEPS": 8000, "DT": 0.2e-9}
-case_2 = {"WA": 5 * 2 * np.pi * 1e9, "TOT_TIME": 4e-6, "STEPS": 4000, "DT": 1e-9}
+CASE_1 = {"wa": 6 * 2 * np.pi * 1e9, "tot_time": 1.6e-6, "steps": 8000, "dt": 0.2e-9}
+CASE_2 = {"wa": 5 * 2 * np.pi * 1e9, "tot_time": 4e-6, "steps": 4000, "dt": 1e-9}
 
 
-def jc_ham(wc=WC, wa=case_1["WA"], g=G) -> Qobj:
+def jc_ham(case_params) -> Qobj:
     """Returns the Jaynes-Cummings Hamiltonian."""
-    ham = wc * tensor(create(N) * destroy(N), identity(2))
-    ham += (1 / 2) * wa * tensor(identity(N), sigmaz())
-    ham -= g * (tensor(destroy(N), sigmap()) + tensor(create(N), sigmam()))
+    ham = WC * tensor(create(N) * destroy(N), identity(2))
+    ham += (1 / 2) * case_params["wa"] * tensor(identity(N), sigmaz())
+    ham -= G * (tensor(destroy(N), sigmap()) + tensor(create(N), sigmam()))
     return ham
 
 
-def evolve_state(init_state: Qobj, ham: Qobj, steps, dt=DT) -> list:
+def evolve_state(init_state: Qobj, ham: Qobj, case_params) -> list:
     """
     Evolves an initial state in time according to a given Hamiltonian and returns an array describing the state
     after each time step.
     :return An list of ket states, where each ket state is the time evolution of the initial state after the
     corresponding time step.
     """
-    time_evo_op = Qobj.expm((-1j * dt) * ham)
+    time_evo_op = Qobj.expm((-1j * case_params["dt"]) * ham)
     psi = init_state
     psi_t = list()
-    for step in range(steps):
+    for step in range(case_params["steps"]):
         psi = time_evo_op * psi
         psi_t.append(psi)
     return psi_t
@@ -76,11 +71,11 @@ def rdm(rho: Qobj) -> Qobj:
     return Qobj(rdm)
 
 
-def draw_excited_state_population(psi_t: Iterable, steps=STEPS, dt=DT):
+def draw_excited_state_population(psi_t: Iterable, case_params):
     """Draws the excited state population figure."""
     rdms = [rdm(psi * psi.dag()) for psi in psi_t]
     ee_pop = [rho[0, 0] for rho in rdms]
-    times = np.linspace(0.0, steps * dt, steps)
+    times = np.linspace(0.0, case_params["steps"] * case_params["dt"], case_params["steps"])
     plt.plot(times, ee_pop, linewidth=0.5)
     plt.xlabel("Time (s)")
     plt.ylabel("Excited TLS Population")
@@ -88,11 +83,11 @@ def draw_excited_state_population(psi_t: Iterable, steps=STEPS, dt=DT):
     plt.show()
 
 
-def draw_purity_plot(psi_t: Iterable, steps=case_1["STEPS"], dt=case_1["DT"]):
+def draw_purity_plot(psi_t: Iterable, case_params):
     """Draws the purity figure"""
     rdms = [rdm(psi * psi.dag()).data.toarray() for psi in psi_t]
     purities = [np.trace(np.dot(rdm, rdm)) for rdm in rdms]
-    times = np.linspace(0.0, steps * dt, steps)
+    times = np.linspace(0.0, case_params["steps"] * case_params["dt"], case_params["steps"])
     plt.plot(times, purities, linewidth=0.7)
     plt.xlabel("Time (s)")
     plt.ylabel(r'$Tr(\rho_{TLS}^2)$')
@@ -100,23 +95,34 @@ def draw_purity_plot(psi_t: Iterable, steps=case_1["STEPS"], dt=case_1["DT"]):
     plt.show()
 
 
-def draw_bosonic_state_density(psi_t: Iterable,  steps=case_1["STEPS"], dt=case_1["DT"]):
+def draw_bosonic_state_density(psi_t: Iterable, case_params):
+    """Draws state intensity figure"""
     psi = np.array(psi_t).squeeze()
-    # psi = psi[:, ::2]
     state_dens = np.array([np.real(st * np.conjugate(st)) for st in psi]).T
     state_dens = np.concatenate((state_dens[::2, :], state_dens[1::2, :]), axis=0)
-    print(state_dens.shape)
-    times = np.linspace(0.0, steps * dt, steps) * np.ones_like(state_dens)
+    times = np.linspace(0.0, case_params["steps"] * case_params["dt"], case_params["steps"])
+    times = times * np.ones_like(state_dens)
     states = np.expand_dims(np.arange(0, len(state_dens)), 1) * np.ones_like(state_dens)
-    #* np.ones_like(state_dens[0])
-    print(state_dens)
-    plt.pcolormesh(times, states, state_dens, cmap='hot')
+    plt.pcolormesh(times, states, state_dens, cmap='inferno')
+    plt.suptitle("Occupation Vs. Time")
+    plt.ylabel("State Index")
+    plt.xlabel("Time (s)")
     plt.show()
 
 
 if __name__ == '__main__':
-    H = jc_ham()
+    params = CASE_1
+    H = jc_ham(params)
+    psi0 = case1_init_state()
+    psi_t = evolve_state(psi0, H, params)
+    draw_excited_state_population(psi_t, params)
+    draw_purity_plot(psi_t, params)
+    draw_bosonic_state_density(psi_t, params)
+
+    params = CASE_2
+    H = jc_ham(params)
     psi0 = case2_init_state()
-    psi_t = evolve_state(psi0, H, case_1["STEPS"])
-    # draw_purity_plot(psi_t)
-    draw_bosonic_state_density(psi_t)
+    psi_t = evolve_state(psi0, H, params)
+    draw_excited_state_population(psi_t, params)
+    draw_purity_plot(psi_t, params)
+    draw_bosonic_state_density(psi_t, params)
